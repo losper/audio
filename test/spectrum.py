@@ -1,25 +1,37 @@
-import wave
-import struct
-from scipy import *
-from pylab import *
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May 12 10:30:00 2017
+@author: Lyrichu
+@description: show the sound in graphs
+"""
+import pyaudio
+import numpy as np
+import pylab
+import time
 
-wavefile=wave.open("E:/git/passoa/audio/sample/1.wav","r")
-nchannels=wavefile.getnchannels()
-sample_width=wavefile.getsampwidth()
-framerate=wavefile.getframerate()
-numframes=wavefile.getnframes()
+RATE = 44100
+CHUNK = int(RATE/20) # RATE/number of updates per second
 
-print("nchannels",nchannels)
-print("sample_width",sample_width)
-print("framerate",framerate)
-print("numframes",numframes)
+def sound_plot(stream):
+    t1 = time.time() # time starting
+    data = np.fromstring(stream.read(CHUNK),dtype = np.int16)
+    pylab.plot(data)
+    pylab.title(i)
+    pylab.grid()
+    pylab.axis([0,len(data),-2**8,2**8])
+    pylab.savefig("sound.png",dpi=50)
+    pylab.show(block = False)
+    time.sleep(0.5)
+    pylab.close('all')
+    print("took %.2f ms." % (time.time() - t1)*1000)
 
-y=np.zeros(numframes)
-for i in range(numframes):
-    val = wavefile.readframes(1)
-    left = val[0:2]
-    v=struct.unpack("h",left)[0]
-    y[i]=v
-Fs=framerate
-specgram(y,NFFT=1024,Fs=Fs,noverlap=900)
-show()
+if __name__ == '__main__':
+    p = pyaudio.PyAudio()
+    stream = p.open(format = pyaudio.paInt16,channels = 1,rate = RATE,
+                    input = True,frames_per_buffer = CHUNK)
+    for i in range(int(20*RATE/CHUNK)): 
+        # for 10 seconds
+        sound_plot(stream)
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
