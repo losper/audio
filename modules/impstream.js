@@ -6,10 +6,10 @@ function InputStream(opt){
 	this.trigger(ev,data);
     }
     var inst=audio.open(opt.seconds,opt.channels,opt.format,opt.rate,opt.frames,this.callback.bind(this));
-    this.resume=function(){
-	audio.record(inst);
+    this.record=function(sec){
+	console.log(opt);
+	audio.record(inst,sec);
     }
-    audio.record(inst);
 }
 InputStream.prototype = new Stream();
 
@@ -31,11 +31,5 @@ OutputStream.prototype = new Stream();
 
 module.exports={
     InputStream:InputStream,
-    OutputStream:OutputStream,
-    float32:1,
-    int32:2,
-    int24:4,
-    int16:8,
-    int8:16,
-    uint8:32
+    OutputStream:OutputStream
 }

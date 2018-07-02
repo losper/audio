@@ -12,7 +12,7 @@ public:
 		return mgr;
 	};
 	virtual int resume() = 0;
-	virtual int record() = 0;
+	virtual int record(uint32_t ) = 0;
 	virtual int play(void* p, uint32_t len) = 0;
 };
 template<typename T>
@@ -73,11 +73,12 @@ public:
 		pa.start();
 		return 0;
 	}
-	int record() {
+	int record(uint32_t rec_len) {
 		if (closed) {
 			closed = pa.open(1, channel, fmt, sampleRate, framesPerBuffer, recordCallback, this);
 		}
 		if (!closed) {
+			this->rec_len=rec_len;
 			pa.start();
 		}
 		return 0;
@@ -158,7 +159,8 @@ public:
 		}
 		idx += framesToCalc;
 		if (finished) {
-			io_.dispatch(boost::bind(&jsAudio::__onReaded, this));
+			io_.post(boost::bind(&jsAudio::__onReaded, this, boost::shared_ptr<std::vector<T>>(new std::vector<T>(samples, samples + max*channel))));
+			//io_.dispatch(boost::bind(&jsAudio::__onReaded, this));
 			idx = 0;
 		}
 		return finished;
@@ -176,12 +178,13 @@ private:
 		duk_pcall(ctx_, 2);
 		duk_pop(ctx_);
 	}
-	void __onReaded() {
+	void __onReaded(boost::shared_ptr<std::vector<T>> tmp) {
 		duk_eval_string(ctx_, "(passoa_callbacks.call.bind(passoa_callbacks))");
 		duk_push_int(ctx_, ref_);
 		duk_push_string(ctx_, "data");
 		duk_push_external_buffer(ctx_);
-		duk_config_buffer(ctx_, -1, (void*)samples, max*channel*sizeof(T));
+		
+		duk_config_buffer(ctx_, -1, (void*)tmp->data(), tmp->size()*sizeof(T)/*max*channel*sizeof(T)*/);
 		duk_pcall(ctx_, 3);
 		/*if (duk_is_number(ctx_, -1) && 0 == duk_to_int(ctx_, -1)) {
 			pa.stop();
@@ -243,6 +246,7 @@ private:
 	uint32_t fmt;
 	uint32_t sampleRate;
 	uint32_t framesPerBuffer;
+	uint32_t rec_len;
 	int closed;
 };
 
@@ -296,12 +300,12 @@ int audioOpen(duk_context* ctx) {
 }
 
 int audioRecord(duk_context* ctx) {
-	if (!duk_is_pointer(ctx,0)) {
+	if (!duk_is_pointer(ctx,0) && !duk_is_number(ctx,1)) {
 		return 0;
 	}
 	std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it=jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(duk_to_pointer(ctx, 0)));
 	if (it != jsAudioInterface::mgr().end()) {
-		it->second->record();
+		it->second->record(duk_to_uint(ctx,1));
 	}
 	return 0;
 }

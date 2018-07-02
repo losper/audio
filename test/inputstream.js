@@ -3,13 +3,10 @@ const fs=require("fs");
 const opt={channels:2,format:audio.int16,rate:44100,frames:512,seconds:2};
 
 const ais=new audio.InputStream(opt);
-const aos=new audio.OutputStream(opt);
 ais.on("data",function(data){
-    console.log(data);
-    aos.push(data);
+    fs.appendFile("test.pcm",data);
 })
-aos.on("done",function(){
-    console.log("play");
-    ais.resume();
-});
+ais.on("done",function(){});
+ais.record(10);
+ais.record(5);
 console.log("test Audio!!!");

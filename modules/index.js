@@ -1,38 +1,23 @@
-var audio = require("./audio.passoa");
-function audioPlay(opt,buf,cb){
-    audio.play(opt.seconds,opt.channels,opt.format,opt.rate,opt.frames,buf,cb);
-}
-function audioRecord(opt,cb){
-    console.log("");
-}
-
-function RecordStream(opt,cb){
-    var inst=audio.open(opt.seconds,opt.channels,opt.format,opt.rate,opt.frames);
-    //console.log(__dirname);
-    audio.record(inst,cb);
-    this.resume=function(){
+const imp=require("./impstream.js");
+function record(path,sec,opt){
+    var ins=new imp.InputStream(opt);
+    ins.on("data",function(data){
 	
-    }
-}
-
-function PlayStream(opt){
-    var inst=audio.open(opt.seconds,opt.channels,opt.format,opt.rate,opt.frames);
-    this.callback=function(){
-	console.log("aps.push.callback");
-    }
-    this.push=function(buf){
-	audio.play(inst,buf,this.callback.bind(this));
+    });
+    ins.on("done",function(){
 	
-    }
+    });
+    ins.record(sec);
+
 }
 
 module.exports={
-    RecordStream:RecordStream,
-    PlayStream:PlayStream,
+    InputStream:imp.InputStream,
+    OutputStream:imp.OutputStream,
     float32:1,
     int32:2,
     int24:4,
     int16:8,
     int8:16,
-    uint8:32,
+    uint8:32
 }
