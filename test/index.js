@@ -1,15 +1,26 @@
-var audio = require("audio");
-const fs=require("fs");
-const opt={channels:2,format:audio.int16,rate:44100,frames:512,seconds:2};
-
-const ais=new audio.InputStream(opt);
-const aos=new audio.OutputStream(opt);
-ais.on("data",function(data){
-    console.log(data);
-    aos.push(data);
-})
-aos.on("done",function(){
-    console.log("play");
-    ais.resume();
+var net=require("net");
+var util=require("util");
+var pack=require("pack");
+var fs=require("fs");
+var Robot=require("./src/robot");
+var cli=require("./client.js");
+function runTest(rb){
+    rb.record("test.pcm",3);
+    rb.play("test.pcm");
+    // rb.click("com.android.dialer:id/floating_action_button");
+    // rb.wait("com.android.dialer:id/dialpad_floating_action_button);
+}
+var s=net.createServer(function(c){
+    // var pos=new pack.outputStream();
+    // pos.on("data",function(msg){
+    // 	console.log(msg);
+    // });
+    // c.on("data",function(data){
+    // 	pos.push(data);
+    // })
+    var inst=new Robot(c,runTest);
+    inst.start();
 });
-console.log("test Audio!!!");
+
+s.listen(8009);
+cli.test();

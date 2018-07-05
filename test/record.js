@@ -1,10 +1,19 @@
-var robot=require("./robot.js");
-function workthread(rb){
-    const opt={channels:2,format:8,rate:44100,frames:512,seconds:2};
-    rb.record("test.pcm",10,opt);
-    rb.record("test1.pcm",5,opt);
-    rb.play("test.pcm");
-    rb.play("test1.pcm");
-}
-
-new robot(workthread).start();
+const audio=require("audio");
+const opt={channels:2,format:8,rate:44100,frames:44100};
+var ais=new audio.InputStream(opt);
+const fs=require("fs");
+var gsize=0;
+ais.on("data",function(data){
+    if(gsize){
+    	fs.appendFile("out.pcm",data);
+    }else{
+    	console.log("rewrite!!!!");
+    	fs.writeFile("out.pcm",data);
+    }
+    console.log(gsize+=data.length);
+});
+ais.on("done",function(){
+    ais.destroy();
+    console.log("record done");
+})
+ais.record(3);

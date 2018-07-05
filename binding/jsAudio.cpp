@@ -5,13 +5,14 @@
 #include <boost/bind.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <iostream>
+#include "../src/circularbuffer.hpp"
 class jsAudioInterface {
 public:
 	static std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>& mgr() {
 		static std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>> mgr;
 		return mgr;
 	};
-	virtual int resume() = 0;
+	virtual int destroy() = 0;
 	virtual int record(uint32_t ) = 0;
 	virtual int play(void* p, uint32_t len) = 0;
 };
@@ -24,7 +25,7 @@ public:
 		mgr().insert(std::pair<jsAudio<T>*, boost::shared_ptr<jsAudioInterface>>(this,shared_from_this()));
 		return this;
 	}
-	jsAudio(duk_context* ctx, boost::asio::io_service& io, int sec, uint32_t channel, uint32_t fmt, uint32_t sampleRate, unsigned long framesPerBuffer)
+	jsAudio(duk_context* ctx, boost::asio::io_service& io, uint32_t channel, uint32_t fmt, uint32_t sampleRate, unsigned long framesPerBuffer)
 		:io_(io),
 		ctx_(ctx),
 		ref_(-1),
@@ -36,59 +37,56 @@ public:
 		fmt(fmt),
 		sampleRate(sampleRate),
 		framesPerBuffer(framesPerBuffer),
+		elapsed(0),
+		duration(0),
+		cb(0),
 		closed(1){
 		bindRef();
 		worker = new boost::asio::io_service::work(io);
-		max = sec*sampleRate;
-		samples = new T[max*channel];
+		samples = new T[framesPerBuffer*channel];
 	}
 	~jsAudio() {
 		freeRef();
-		delete samples;
-		delete worker;
-	}
-	void stop() {
-		pa.stop();
-	}
-	void start() {
-		pa.start();
+		if (cb)delete cb;
+		if(samples)delete[] samples;
+		if (worker)delete worker;
 	}
 	int play(void* p, uint32_t len) {
 		if (closed) {
 			closed =pa.open(0, channel, fmt, sampleRate, framesPerBuffer, playCallback, this);
 		}
 		if (!closed) {
-			
-			uint32_t bytes=max*channel * sizeof(T);
-			if (len > bytes) {
-				len = bytes;
+			if (!cb) {
+				cb = new CircularBuffer<T>(sampleRate*channel*4);
 			}
-			memcpy(samples, p, len);
-			pa.start();
+			cb->write((const T*)p, len/sizeof(T));
+			if(finished){
+				pa.start();
+			}
 		}
 		return 0;
 	}
-	int resume() {
-		pa.stop();
-		pa.start();
+	int destroy() {
+		pa.destroy();
+		io_.post(boost::bind(&jsAudio<T>::remove_this, this));
 		return 0;
 	}
-	int record(uint32_t rec_len) {
+	int record(uint32_t duration) {
 		if (closed) {
 			closed = pa.open(1, channel, fmt, sampleRate, framesPerBuffer, recordCallback, this);
 		}
 		if (!closed) {
-			this->rec_len=rec_len;
+			this->duration=duration*sampleRate;
+			std::cout << "record!!!!" << std::endl;
 			pa.start();
 		}
 		return 0;
 	}
 	int onWritten(const void* outputBuffer, unsigned long framesPerBuffer) {
-		T *rptr = &samples[idx * channel];
+		uint32_t framesLeft = cb->read(samples, framesPerBuffer*channel);
+		T *rptr = samples;
 		T *wptr = (T*)outputBuffer;
 		unsigned int i;
-		int finished;
-		unsigned int framesLeft = max - idx;
 
 		if (framesLeft < framesPerBuffer)
 		{
@@ -103,7 +101,6 @@ public:
 				*wptr++ = 0;  /* left */
 				if (channel == 2) *wptr++ = 0;  /* right */
 			}
-			idx += framesLeft;
 			finished = paComplete;
 		}
 		else
@@ -113,32 +110,30 @@ public:
 				*wptr++ = *rptr++;  /* left */
 				if (channel == 2) *wptr++ = *rptr++;  /* right */
 			}
-			idx += framesPerBuffer;
 			finished = paContinue;
 		}
 		if (finished) {
-			io_.post(boost::bind(&jsAudio::__onWritten, this));
-			idx = 0;
+			io_.post(boost::bind(&jsAudio::__onDone, this));
 		}
 		return finished;
 	}
 	int onReaded(const void* inputBuffer, unsigned long framesPerBuffer) {
 		const T *rptr = (const T*)inputBuffer;
-		T *wptr = &samples[idx * channel];
+		T *wptr = samples;
 		long framesToCalc;
 		long i;
-		int finished;
-		unsigned long framesLeft = max - idx;
+		
+		unsigned long framesLeft =  duration - elapsed;
 
-		if (framesLeft < framesPerBuffer)
+		if (framesLeft > framesPerBuffer)
 		{
-			framesToCalc = framesLeft;
-			finished = paComplete;
+			framesToCalc = framesPerBuffer;
+			finished = paContinue; 
 		}
 		else
 		{
-			framesToCalc = framesPerBuffer;
-			finished = paContinue;
+			framesToCalc = framesLeft;
+			finished = paComplete;
 		}
 
 		if (inputBuffer == NULL)
@@ -157,11 +152,11 @@ public:
 				if (channel == 2) *wptr++ = *rptr++;  /* right */
 			}
 		}
-		idx += framesToCalc;
+		elapsed += framesToCalc;
+		io_.post(boost::bind(&jsAudio::__onReaded, this, boost::shared_ptr<std::vector<T>>(new std::vector<T>(samples, samples + framesToCalc*channel))));
 		if (finished) {
-			io_.post(boost::bind(&jsAudio::__onReaded, this, boost::shared_ptr<std::vector<T>>(new std::vector<T>(samples, samples + max*channel))));
-			//io_.dispatch(boost::bind(&jsAudio::__onReaded, this));
-			idx = 0;
+			elapsed = 0;
+			io_.post(boost::bind(&jsAudio::__onDone, this));
 		}
 		return finished;
 	}
@@ -171,7 +166,7 @@ private:
 		std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it=m.find(pr);
 		m.erase(it);
 	}
-	void __onWritten() {
+	void __onDone() {
 		duk_eval_string(ctx_, "(passoa_callbacks.call.bind(passoa_callbacks))");
 		duk_push_int(ctx_, ref_);
 		duk_push_string(ctx_, "done");
@@ -179,6 +174,7 @@ private:
 		duk_pop(ctx_);
 	}
 	void __onReaded(boost::shared_ptr<std::vector<T>> tmp) {
+		//duk_push_heap_stash
 		duk_eval_string(ctx_, "(passoa_callbacks.call.bind(passoa_callbacks))");
 		duk_push_int(ctx_, ref_);
 		duk_push_string(ctx_, "data");
@@ -186,14 +182,6 @@ private:
 		
 		duk_config_buffer(ctx_, -1, (void*)tmp->data(), tmp->size()*sizeof(T)/*max*channel*sizeof(T)*/);
 		duk_pcall(ctx_, 3);
-		/*if (duk_is_number(ctx_, -1) && 0 == duk_to_int(ctx_, -1)) {
-			pa.stop();
-			pa.start();
-		}
-		else {
-			pa.stop();
-			io_.post(boost::bind(&jsAudio<T>::remove_this,this));
-		}*/
 		duk_pop(ctx_);
 	}
 	static int recordCallback(const void *inputBuffer, void *outputBuffer,
@@ -239,6 +227,7 @@ private:
 	int ref_;
 	boost::asio::io_service::work* worker;
 	T* samples;
+	CircularBuffer<T>* cb;
 	uint32_t idx;
 	uint32_t max;
 	uint32_t sec;
@@ -247,48 +236,51 @@ private:
 	uint32_t sampleRate;
 	uint32_t framesPerBuffer;
 	uint32_t rec_len;
+	uint32_t duration;
+	uint32_t elapsed;
 	int closed;
+	int finished;
 };
 
 int audioOpen(duk_context* ctx) {
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 4; i++) {
 		if (!duk_is_number(ctx, i)){
 			std::cout << duk_get_type(ctx, i) << std::endl;
 			return 0;
 		}
 	}
-	if (!duk_is_function(ctx, 5)) {
+	if (!duk_is_function(ctx, 4)) {
 		return 0;
 	}
 	jsAudioInterface* jai = NULL;
-	switch (duk_to_int(ctx, 2)) {
+	switch (duk_to_int(ctx, 1)) {
 	case paInt32:
 		{
-			boost::shared_ptr<jsAudio<int32_t>> pr(new jsAudio<int32_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3), duk_to_int(ctx, 4))) ;
+			boost::shared_ptr<jsAudio<int32_t>> pr(new jsAudio<int32_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3))) ;
 			jai = pr->attach();
 		}
 		break;
 	case paInt16:
 		{
-			boost::shared_ptr<jsAudio<int16_t>> pr(new jsAudio<int16_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3), duk_to_int(ctx, 4)));
+			boost::shared_ptr<jsAudio<int16_t>> pr(new jsAudio<int16_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
 			jai = pr->attach();
 		}
 		break;
 	case paInt8:
 		{
-			boost::shared_ptr<jsAudio<int8_t>> pr(new jsAudio<int8_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3), duk_to_int(ctx, 4)));
+			boost::shared_ptr<jsAudio<int8_t>> pr(new jsAudio<int8_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
 			jai = pr->attach();
 		}
 		break;
 	case paFloat32:
 		{
-			boost::shared_ptr<jsAudio<float_t>> pr(new jsAudio<float_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3), duk_to_int(ctx, 4)));
+			boost::shared_ptr<jsAudio<float_t>> pr(new jsAudio<float_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
 			jai = pr->attach();
 		}
 		break;
 	case paUInt8:
 		{
-			boost::shared_ptr<jsAudio<uint8_t>> pr(new jsAudio<uint8_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3), duk_to_int(ctx, 4)));
+			boost::shared_ptr<jsAudio<uint8_t>> pr(new jsAudio<uint8_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
 			jai = pr->attach();
 		}
 		break;
@@ -321,13 +313,13 @@ int audioPlay(duk_context* ctx) {
 	}
 	return 0;
 }
-int audioResume(duk_context* ctx) {
+int audioDestroy(duk_context* ctx) {
 	if (!duk_is_pointer(ctx, 0)) {
 		return 0;
 	}
 	std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it = jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(duk_to_pointer(ctx, 0)));
 	if (it != jsAudioInterface::mgr().end()) {
-		it->second->resume();
+		it->second->destroy();
 	}
 	return 0;
 }

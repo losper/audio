@@ -62,13 +62,19 @@ int portAudio::open(int direction, uint32_t channel, uint32_t pmt,uint32_t sampl
 	return 0;
 }
 int portAudio::start() {
-	if (!Pa_IsStreamActive(stream)) {
-		if (!Pa_IsStreamStopped(stream)) {
-			stop();
+	for (int i = 0; i < 100;i++){
+		if (Pa_IsStreamActive(stream)) {
+			Pa_Sleep(10);
 		}
-		err_ = Pa_StartStream(stream);
-		if (err_ != paNoError) std::cout << "PortAudio error: " << Pa_GetErrorText(err_) << std::endl;
+		else {
+			break;
+		}
 	}
+	if (!Pa_IsStreamStopped(stream)) {
+		stop();
+	}
+	err_ = Pa_StartStream(stream);
+	if (err_ != paNoError) std::cout << "PortAudio error: " << Pa_GetErrorText(err_) << std::endl;
 	return 0;
 }
 int portAudio::stop() {
@@ -76,6 +82,11 @@ int portAudio::stop() {
 	err_ = Pa_StopStream(stream);
 	if (err_ != paNoError)
 		std::cout << "PortAudio error: " << Pa_GetErrorText(err_) << std::endl;
+	return 0;
+}
+int portAudio::destroy()
+{
+	Pa_CloseStream(stream);
 	return 0;
 }
 portAudio::portAudio() {
