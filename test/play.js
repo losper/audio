@@ -10,9 +10,9 @@ aos.on("drain",function(){
     console.log("drain");
     written=aos.push(buf);
     if(buf.length>written){
-	buf=buf.subarray(written);
+		buf=buf.subarray(written);
     }else{
-	rs.resume();
+		rs.resume();
     }
 })
 aos.on("done",function(){

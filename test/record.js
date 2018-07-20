@@ -16,4 +16,4 @@ ais.on("done",function(){
     ais.shutdown();
     console.log("record done");
 })
-ais.record(15);
+ais.record();
