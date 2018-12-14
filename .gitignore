@@ -24,11 +24,13 @@
 *.ts
 *.h264
 *.pcm
+
 \#*
 build/*
 !build/*.bat
 binary/*/
 binary/*
+stage
 !.gitignore
 !.travis.yml
 !*.sh

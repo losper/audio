@@ -1,16 +1,17 @@
-#include "../src/audio.h"
-#include "duk/duktape.h"
-#include "jsLoop.h"
+
 #include "jsAudio.h"
-#include <boost/bind.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <iostream>
 #include "../src/circularbuffer.hpp"
-#include "boost/asio.hpp"
+#include <map>
+#include <memory>
+#include "../src/audio.h"
+
+#if 0
+extern pa_plugin gp;
 class jsAudioInterface {
 public:
-	static std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>& mgr() {
-		static std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>> mgr;
+	static std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>>& mgr() {
+		static std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>> mgr;
 		return mgr;
 	};
 	virtual int shutdown() = 0;
@@ -19,16 +20,15 @@ public:
 };
 template<typename T>
 class jsAudio 
-	:public boost::enable_shared_from_this<jsAudio<T>> 
+	:public std::enable_shared_from_this<jsAudio<T>> 
 	,public jsAudioInterface{
 public:
 	jsAudio<T>* attach() {
-		mgr().insert(std::pair<jsAudio<T>*, boost::shared_ptr<jsAudioInterface>>(this,shared_from_this()));
+		mgr().insert(std::pair<jsAudio<T>*, std::shared_ptr<jsAudioInterface>>(this,shared_from_this()));
 		return this;
 	}
-	jsAudio(duk_context* ctx, boost::asio::io_service& io, uint32_t channel, uint32_t fmt, uint32_t sampleRate, unsigned long framesPerBuffer)
-		:io_(io),
-		ctx_(ctx),
+	jsAudio(pa_context* ctx, uint32_t channel, uint32_t fmt, uint32_t sampleRate, unsigned long framesPerBuffer)
+		:ctx_(ctx),
 		ref_(-1),
 		samples(0),
 		channel(channel),
@@ -42,7 +42,7 @@ public:
 		shuting(0),
 		finished(1){
 		bindRef();
-		worker = new boost::asio::io_service::work(io);
+		worker = new std::asio::io_service::work(io);
 		samples = new T[framesPerBuffer*channel];
 	}
 	~jsAudio() {
@@ -76,7 +76,7 @@ public:
 	int destroy() {
 		if (shuting) {
 			pa.destroy();
-			io_.post(boost::bind(&jsAudio<T>::remove_this, this));
+			io_.post(std::bind(&jsAudio<T>::remove_this, this));
 		}
 		return 0;
 	}
@@ -97,12 +97,12 @@ public:
 		T *wptr = (T*)outputBuffer;
 		unsigned int i;
 		if (finished) {
-			io_.post(boost::bind(&jsAudio::__onEvent, this, "done"));
-			io_.post(boost::bind(&jsAudio::destroy, this));
+			io_.post(std::bind(&jsAudio::__onEvent, this, "done"));
+			io_.post(std::bind(&jsAudio::destroy, this));
 			return finished;
 		}
 		if (!shuting && drain && (cb->size() < (cb->capacity() / 4))) {
-			io_.post(boost::bind(&jsAudio::__onEvent, this, "drain"));
+			io_.post(std::bind(&jsAudio::__onEvent, this, "drain"));
 		}
 		if (framesLeft < framesPerBuffer)
 		{
@@ -168,33 +168,34 @@ public:
 			}
 		}
 		elapsed += framesToCalc;
-		io_.post(boost::bind(&jsAudio::__onReaded, this, boost::shared_ptr<std::vector<T>>(new std::vector<T>(samples, samples + framesToCalc*channel))));
+		io_.post(std::bind(&jsAudio::__onReaded, this, std::shared_ptr<std::vector<T>>(new std::vector<T>(samples, samples + framesToCalc*channel))));
 		if (finished) {
 			elapsed = 0;
-			io_.post(boost::bind(&jsAudio::__onEvent, this,"done"));
-			io_.post(boost::bind(&jsAudio::destroy, this));
+            
+			io_.post(std::bind(&jsAudio::__onEvent, this,"done"));
+			io_.post(std::bind(&jsAudio::destroy, this));
 		}
 		return finished;
 	}
 private:
 	static void remove_this(jsAudio<T>* pr) {
-		std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>& m=mgr();
-		std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it=m.find(pr);
+		std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>>& m=mgr();
+		std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>>::iterator it=m.find(pr);
 		m.erase(it);
 	}
 	void __onEvent(const char* ev) {
 		duk_eval_string(ctx_, "(passoa_callbacks.call.bind(passoa_callbacks))");
-		duk_push_int(ctx_, ref_);
-		duk_push_string(ctx_, ev);
+		gp.push_int(ctx_, ref_);
+		gp.push_string(ctx_, ev);
 		duk_pcall(ctx_, 2);
 		duk_pop(ctx_);
 	}
-	void __onReaded(boost::shared_ptr<std::vector<T>> tmp) {
-		//duk_push_heap_stash
+	void __onReaded(std::shared_ptr<std::vector<T>> tmp) {
+		//gp.push_heap_stash
 		duk_eval_string(ctx_, "(passoa_callbacks.call.bind(passoa_callbacks))");
-		duk_push_int(ctx_, ref_);
-		duk_push_string(ctx_, "data");
-		duk_push_external_buffer(ctx_);
+		gp.push_int(ctx_, ref_);
+		gp.push_string(ctx_, "data");
+		gp.push_external_buffer(ctx_);
 		
 		duk_config_buffer(ctx_, -1, (void*)tmp->data(), tmp->size()*sizeof(T));
 		duk_pcall(ctx_, 3);
@@ -223,25 +224,23 @@ private:
 		duk_eval_string(ctx_, "(passoa_callbacks.push.bind(passoa_callbacks))");
 		duk_dup(ctx_, -2);
 		duk_pcall(ctx_, 1);
-		if (duk_is_number(ctx_, -1)) {
-			ref_ = duk_to_int(ctx_, -1);
+		if (gp.is_number(ctx_, -1)) {
+			ref_ = gp.get_int(ctx_, -1);
 		}
 		duk_pop(ctx_);
 	}
 	void freeRef() {
 		if (ref_ != -1) {
 			duk_eval_string(ctx_, "(passoa_callbacks.free.bind(passoa_callbacks))");
-			duk_push_int(ctx_, ref_);
+			gp.push_int(ctx_, ref_);
 			duk_pcall(ctx_, 1);
 			duk_pop(ctx_);
 		}
 	}
 private:
 	portAudio pa;
-	boost::asio::io_service& io_;
-	duk_context* ctx_;
+	pa_context* ctx_;
 	int ref_;
-	boost::asio::io_service::work* worker;
 	T* samples;
 	CircularBuffer<T>* cb;
 	uint32_t channel;
@@ -256,85 +255,87 @@ private:
 	int shuting;
 };
 
-int audioOpen(duk_context* ctx) {
-	for (int i = 0; i < 4; i++) {
-		if (!duk_is_number(ctx, i)){
-			std::cout << duk_get_type(ctx, i) << std::endl;
-			return 0;
-		}
-	}
-	if (!duk_is_function(ctx, 4)) {
-		return 0;
-	}
-	jsAudioInterface* jai = NULL;
-	switch (duk_to_int(ctx, 1)) {
-	case paInt32:
-		{
-			boost::shared_ptr<jsAudio<int32_t>> pr(new jsAudio<int32_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3))) ;
-			jai = pr->attach();
-		}
-		break;
-	case paInt16:
-		{
-			boost::shared_ptr<jsAudio<int16_t>> pr(new jsAudio<int16_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
-			jai = pr->attach();
-		}
-		break;
-	case paInt8:
-		{
-			boost::shared_ptr<jsAudio<int8_t>> pr(new jsAudio<int8_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
-			jai = pr->attach();
-		}
-		break;
-	case paFloat32:
-		{
-			boost::shared_ptr<jsAudio<float_t>> pr(new jsAudio<float_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
-			jai = pr->attach();
-		}
-		break;
-	case paUInt8:
-		{
-			boost::shared_ptr<jsAudio<uint8_t>> pr(new jsAudio<uint8_t>(ctx, jsGetLoop(), duk_to_int(ctx, 0), duk_to_int(ctx, 1), duk_to_int(ctx, 2), duk_to_int(ctx, 3)));
-			jai = pr->attach();
-		}
-		break;
-	default:
-		break;
-	}
-	duk_push_pointer(ctx,jai);
-	return 1;
-}
+//int audioOpen(pa_context* ctx) {
+//	for (int i = 0; i < 4; i++) {
+//		if (!gp.is_number(ctx, i)){
+//			std::cout << gp.get_type(ctx, i) << std::endl;
+//			return 0;
+//		}
+//	}
+//	if (!gp.is_function(ctx, 4)) {
+//		return 0;
+//	}
+//	jsAudioInterface* jai = NULL;
+//	switch (gp.get_int(ctx, 1)) {
+//	case paInt32:
+//		{
+//			std::shared_ptr<jsAudio<int32_t>> pr(new jsAudio<int32_t>(ctx, jsGetLoop(), gp.get_int(ctx, 0), gp.get_int(ctx, 1), gp.get_int(ctx, 2), gp.get_int(ctx, 3))) ;
+//			jai = pr->attach();
+//		}
+//		break;
+//	case paInt16:
+//		{
+//			std::shared_ptr<jsAudio<int16_t>> pr(new jsAudio<int16_t>(ctx, jsGetLoop(), gp.get_int(ctx, 0), gp.get_int(ctx, 1), gp.get_int(ctx, 2), gp.get_int(ctx, 3)));
+//			jai = pr->attach();
+//		}
+//		break;
+//	case paInt8:
+//		{
+//			std::shared_ptr<jsAudio<int8_t>> pr(new jsAudio<int8_t>(ctx, jsGetLoop(), gp.get_int(ctx, 0), gp.get_int(ctx, 1), gp.get_int(ctx, 2), gp.get_int(ctx, 3)));
+//			jai = pr->attach();
+//		}
+//		break;
+//	case paFloat32:
+//		{
+//			std::shared_ptr<jsAudio<float_t>> pr(new jsAudio<float_t>(ctx, jsGetLoop(), gp.get_int(ctx, 0), gp.get_int(ctx, 1), gp.get_int(ctx, 2), gp.get_int(ctx, 3)));
+//			jai = pr->attach();
+//		}
+//		break;
+//	case paUInt8:
+//		{
+//			std::shared_ptr<jsAudio<uint8_t>> pr(new jsAudio<uint8_t>(ctx, jsGetLoop(), gp.get_int(ctx, 0), gp.get_int(ctx, 1), gp.get_int(ctx, 2), gp.get_int(ctx, 3)));
+//			jai = pr->attach();
+//		}
+//		break;
+//	default:
+//		break;
+//	}
+//	gp.push_pointer(ctx,jai);
+//	return 1;
+//}
 
-int audioRecord(duk_context* ctx) {
-	if (!duk_is_pointer(ctx,0) && !duk_is_number(ctx,1)) {
+int audioRecord(pa_context* ctx) {
+	if (!gp.is_pointer(ctx,0) && !gp.is_number(ctx,1)) {
 		return 0;
 	}
-	std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it=jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(duk_to_pointer(ctx, 0)));
+	std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>>::iterator it=jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(gp.get_pointer(ctx, 0)));
 	if (it != jsAudioInterface::mgr().end()) {
-		it->second->record(duk_to_uint(ctx,1));
+		it->second->record(gp.get_int(ctx,1));
 	}
 	return 0;
 }
-int audioPlay(duk_context* ctx) {
-	if (!duk_is_pointer(ctx, 0) || !duk_is_buffer_data(ctx,1)) {
-		duk_push_uint(ctx,0);
+int audioPlay(pa_context* ctx) {
+	if (!gp.is_pointer(ctx, 0) || !gp.is_buffer_data(ctx,1)) {
+		gp.push_uint(ctx,0);
 		return 1;
 	}
-	std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it = jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(duk_to_pointer(ctx, 0)));
+	std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>>::iterator it = jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(gp.get_pointer(ctx, 0)));
 	if (it != jsAudioInterface::mgr().end()) {
-		duk_size_t len = 0;
-		void* buf=duk_require_buffer_data(ctx, 1, &len);
-		duk_push_uint(ctx,it->second->play(buf,len));
+		int len = 0;
+		void* buf=gp.get_buffer_data(ctx, 1, &len);
+		gp.push_uint(ctx,it->second->play(buf,len));
 	}
 	return 1;
 }
-int audioShutdown(duk_context* ctx) {
-	if (!duk_is_pointer(ctx, 0)) {
+int audioShutdown(pa_context* ctx) {
+	if (!gp.is_pointer(ctx, 0)) {
 		return 0;
 	}
-	std::map<jsAudioInterface*, boost::shared_ptr<jsAudioInterface>>::iterator it = jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(duk_to_pointer(ctx, 0)));
+	std::map<jsAudioInterface*, std::shared_ptr<jsAudioInterface>>::iterator it = jsAudioInterface::mgr().find(static_cast<jsAudioInterface*>(gp.get_pointer(ctx, 0)));
 	if (it != jsAudioInterface::mgr().end()) {
 		it->second->shutdown();
 	}
 	return 0;
 }
+
+#endif

@@ -1,6 +1,5 @@
-#include <boost/asio.hpp>
-#include "portaudio/portaudio.h"
-
+#include "portaudio.h"
+#if 0
 class portAudio {
 public:
 	portAudio();
@@ -15,3 +14,4 @@ private:
 };
 int portAudioInit();
 int portAudioExit();
+#endif

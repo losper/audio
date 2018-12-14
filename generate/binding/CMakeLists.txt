@@ -5,15 +5,15 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 ## 添加项目
+include_directories(${PROJECT_SOURCE_DIR}/stage/include)
+LINK_DIRECTORIES (${PROJECT_SOURCE_DIR}/stage/lib)
 
 if(MSVC)
 add_executable(test ${PROJECT_SOURCE_DIR}/binding/test.cpp)
 add_library(audio SHARED
 				${PROJECT_SOURCE_DIR}/binding/index.cpp
-				${PROJECT_SOURCE_DIR}/binding/jsLoop.cpp
 				${PROJECT_SOURCE_DIR}/binding/jsAudio.cpp
 				${PROJECT_SOURCE_DIR}/binding/export.def
-				${PROJECT_SOURCE_DIR}/binding/duk/duktape.c
 				${PROJECT_SOURCE_DIR}/src/audio.cpp
 				)
 target_link_libraries(audio

@@ -1,4 +1,6 @@
-int audioOpen(duk_context* ctx);
-int audioRecord(duk_context* ctx);
-int audioPlay(duk_context* ctx);
-int audioShutdown(duk_context* ctx);
+#include "plugin.h"
+
+int audioOpen(pa_context* ctx);
+int audioRecord(pa_context* ctx);
+int audioPlay(pa_context* ctx);
+int audioShutdown(pa_context* ctx);
