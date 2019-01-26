@@ -1,0 +1,1 @@
+ffmpeg.exe -ss 2 -t 5 -i 1.mp4 -s 128*72 -r 15 output1.gif

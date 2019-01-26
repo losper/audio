@@ -7,8 +7,7 @@ var pos=new pack.outputStream();
 var inst;
 
 pis.on("data",function(data){
-    console.log("!data",data.constructor.name);
-	inst.write(data);
+    inst.write(data);
 });
 var wss=ws.createServer(function(c){
     inst=c;

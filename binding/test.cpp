@@ -1,25 +1,71 @@
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#include <iostream>
+#include <stdint.h>
+#include <string>
 #include <vector>
-#include <boost/array.hpp>
+#include <iostream>
+#include <chrono>
 
-int test1(boost::shared_ptr<std::vector<char>> x) {
-	const char* p1 = x->data();
-	std::cout << p1 << x->size() << std::endl;
-	return 0;
+uint32_t toHash(std::string& str)
+{
+    //BKDRHash
+    uint32_t seed = 131; // 31 131 1313 13131 131313 etc..
+    uint32_t hash = 0;
+
+    for(auto it:str)
+    {
+        hash = hash * seed + it;
+    }
+    return (hash & 0x7FFFFFFF);
 }
-int test(boost::asio::io_service& io) {
-	char x[6] = "12345";
-	boost::shared_ptr<std::vector<char>> data(new std::vector<char>(x,x+6));
-	for(int i=0;i<100;i++){
-		io.post(boost::bind(test1, data));
-	}
-	return 0;
+uint32_t simHash(std::vector<std::pair<uint32_t,int>> feature) {
+    int v[32];
+    memset(v, 0, sizeof(int)*32);
+    for (auto it:feature) {
+        for (size_t j = 0; j < 32; j++) {
+            v[j] += (it.first & (1 << j)) ? it.second : -it.second;
+        }
+    }
+    uint32_t hash = 0;
+    for (size_t i = 0; i < 32; i++) {
+        if (v[i] > 0) {
+            hash |= (1 << i);
+        }
+    }
+    return hash;
+}
+uint32_t hanming_distance(uint32_t c1,uint32_t c2) {
+    uint32_t v=c1^c2,dist=0;
+    while (v){
+        v=v & (v-1);
+        dist++;
+    }
+    return dist;
 }
 int main() {
-	boost::asio::io_service io;
-	test(io);
-	io.run();
+    std::string x="ABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVVVVVVVVVVVVV";
+    std::string tmp="ABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKL";
+    std::string v;
+    std::vector<std::pair<uint32_t, int>> list;
+    uint32_t c1, c2;
+    v="123";
+    for (size_t i = 0; i < tmp.size(); )
+    {
+        list.push_back(std::make_pair(toHash(tmp.substr(i,2)), 1));
+        i += 2;
+    }
+    c1=simHash(list);
+    list.clear();
+    for (size_t i = 0; i < x.size(); )
+    {
+        list.push_back(std::make_pair(toHash(x.substr(i, 2)), 1));
+        i += 2;
+    }
+    c2 = simHash(list);
+    std::cout << hanming_distance(c1,c2) << std::endl;
+    /*auto start = std::chrono::system_clock::now();
+    uint32_t val=toHash(x);
+    auto end = std::chrono::system_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << duration.count() << ":" <<  val << std::endl;*/
+    
 	return 0;
 }

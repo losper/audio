@@ -1,0 +1,29 @@
+int __passoa_fs_writeFileSync(duk_context * ctx)
+{
+    const char* path = 0, *buf=0,*flag="w";
+    duk_size_t len = 0,written=0;
+    path = duk_to_string(ctx, 0);
+    try {
+        if (duk_is_buffer_data(ctx, 2)) {
+            buf = (const char*)duk_require_buffer_data(ctx, 2, &len);
+        }
+        if (duk_is_string(ctx, 2)) {
+            buf = duk_require_lstring(ctx, 2, &len);
+        }
+        if (duk_is_object(ctx, 3)) {
+            if (duk_get_prop_string(ctx, -1, "flag")) {
+                if (duk_is_string(ctx, -1)) {
+                    flag=duk_to_string(ctx, -1);
+                }
+            }
+        }
+        FILE* f=fopen(path, flag);
+        written=fwrite(buf, 1, len, f);
+        fclose(f);
+    }
+    catch (std::exception &e) {
+        duk_uri_error(ctx, e.what());
+    }
+    duk_push_int(ctx, written);
+    return 1;  /* one return value */
+}
