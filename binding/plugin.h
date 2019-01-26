@@ -10,6 +10,21 @@ public:
     virtual void run() = 0;
 	virtual ~FnPtr() {}
 };
+
+template<typename T>
+class binder :public FnPtr {
+public:
+    binder(T x) :inst(x) {
+    }
+    virtual void run() {
+        inst();
+    }
+    virtual ~binder() {}
+private:
+    T inst;
+};
+
+
 #define PA_VARARGS -1
 typedef void pa_context;
 typedef void(*pa_io_push)(FnPtr* );
@@ -83,6 +98,11 @@ struct pa_plugin {
     pa_p keep_io;
     pa_vp release_io;
 };
+
+template<typename T>
+void bind_io(pa_plugin& g, T x) {
+    g.post_io(new binder<T>(x));
+}
 
 #endif // !__PASSOA_PLUGIN_HPP__
 

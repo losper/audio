@@ -1,7 +1,7 @@
 
 #include "audio.h"
 #include <iostream>
-#if 0
+
 portAudio::~portAudio() {
 }
 int portAudio::open(int direction, uint32_t channel, uint32_t pmt,uint32_t sampleRate,unsigned long framesPerBuffer,PaStreamCallback psc,void* userData) {
@@ -98,4 +98,3 @@ int portAudioExit() {
 		std::cout << "PortAudio error: " << Pa_GetErrorText(err_) << std::endl;
 	return 0;
 }
-#endif

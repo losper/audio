@@ -1,5 +1,6 @@
 #include "portaudio.h"
-#if 0
+#include <stdint.h>
+
 class portAudio {
 public:
 	portAudio();
@@ -14,4 +15,3 @@ private:
 };
 int portAudioInit();
 int portAudioExit();
-#endif

@@ -3,7 +3,9 @@
 #include <vector>
 #include <iostream>
 #include <chrono>
-
+#include <functional>
+#include <memory>
+#include "plugin.h"
 uint32_t toHash(std::string& str)
 {
     //BKDRHash
@@ -40,8 +42,20 @@ uint32_t hanming_distance(uint32_t c1,uint32_t c2) {
     }
     return dist;
 }
+int testgg(int x,std::shared_ptr<std::vector<int>> tmp) {
+    std::cout << tmp << std::endl;
+    return x;
+}
+
 int main() {
-    std::string x="ABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVVVVVVVVVVVVV";
+    //bind(std::bind(testgg, 122, 23));
+    pa_plugin g;
+    bind_io(g,std::bind(
+        testgg,
+        23,
+        std::make_shared<std::vector<int>>(20)));
+    
+    /*std::string x="ABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVVVVVVVVVVVVV";
     std::string tmp="ABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKL";
     std::string v;
     std::vector<std::pair<uint32_t, int>> list;
@@ -60,12 +74,8 @@ int main() {
         i += 2;
     }
     c2 = simHash(list);
-    std::cout << hanming_distance(c1,c2) << std::endl;
-    /*auto start = std::chrono::system_clock::now();
-    uint32_t val=toHash(x);
-    auto end = std::chrono::system_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << duration.count() << ":" <<  val << std::endl;*/
+    std::cout << hanming_distance(c1,c2) << std::endl;*/
+    
     
 	return 0;
 }
