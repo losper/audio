@@ -2,11 +2,13 @@
 #include "jsAudio.h"
 #include <iostream>
 #include <vector>
+#include <complex>
 #include <functional>
 #include "../src/circularbuffer.hpp"
 #include <map>
 #include <memory>
 #include "../src/audio.h"
+#include "fftw3.h"
 
 extern pa_plugin gp;
 
@@ -362,4 +364,28 @@ int audioShutdown(pa_context* ctx) {
 		it->second->shutdown();
 	}
 	return 0;
+}
+
+int audioFingerprint(pa_context* ctx) {
+    std::vector<std::complex<double>> in;
+    std::vector<std::complex<double>> out;
+    int len = 0; uint16_t* buf;
+    if (gp.is_buffer_data(ctx,0) && gp.is_number(ctx,1))
+    {
+        buf=(uint16_t*)gp.get_buffer_data(ctx, 0, &len);
+        out.resize(len/2);
+        in.resize(len/2);
+        //gp.get_int(ctx,1);
+        for (int i = 0; i < len/2; i++)
+        {
+            in[i].real(buf[i]);
+        }
+        fftw_plan p = fftw_plan_dft_1d(in.size(),
+            reinterpret_cast<fftw_complex*>(in.data()),
+            reinterpret_cast<fftw_complex*>(out.data()),
+            FFTW_FORWARD, FFTW_ESTIMATE);
+        fftw_execute(p); /* repeat as needed */
+        fftw_destroy_plan(p);
+    }
+    return 0;
 }

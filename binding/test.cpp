@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include "plugin.h"
+
 uint32_t toHash(std::string& str)
 {
     //BKDRHash
@@ -49,11 +50,6 @@ int testgg(int x,std::shared_ptr<std::vector<int>> tmp) {
 
 int main() {
     //bind(std::bind(testgg, 122, 23));
-    pa_plugin g;
-    bind_io(g,std::bind(
-        testgg,
-        23,
-        std::make_shared<std::vector<int>>(20)));
     
     /*std::string x="ABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVVVVVVVVVVVVV";
     std::string tmp="ABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKL";

@@ -18,7 +18,8 @@ add_library(audio SHARED
 				)
 target_link_libraries(audio
              portaudio_static_x86
-             )
+			 fftw3
+			 )
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".passoa")
 install(TARGETS audio
 	RUNTIME DESTINATION ./node_modules/audio)

@@ -9,6 +9,7 @@ static const pa_function_list_entry my_module_funcs[] = {
 	{ "open", audioOpen, PA_VARARGS /*nargs*/ },
 	{ "play", audioPlay, PA_VARARGS /*nargs*/ },
 	{ "shutdown", audioShutdown, PA_VARARGS /*nargs*/ },
+    { "fingerprint", audioFingerprint, PA_VARARGS /*nargs*/ },
 	{ NULL, NULL, 0 }
 };
 int passoa_init(pa_plugin p) {

@@ -5,7 +5,7 @@
 import torch
 import numpy as np
  
-z=np.fft.fft([5,3,8,9])
+z=np.fft.fft([3,5,8])
 print(z)
 print(np.fft.ifft(z))
 # x=torch.tensor([5.0,3.0,4.0],requires_grad=True)

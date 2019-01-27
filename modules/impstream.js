@@ -35,5 +35,6 @@ OutputStream.prototype = new Stream();
 
 module.exports={
     InputStream:InputStream,
-    OutputStream:OutputStream
+    OutputStream:OutputStream,
+    fingerprint:audio.fingerprint
 }

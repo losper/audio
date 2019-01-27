@@ -37,3 +37,4 @@ stage
 *node_modules*
 lib
 ext
+output
