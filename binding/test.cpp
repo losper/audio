@@ -17,6 +17,7 @@ uint32_t toHash(std::string& str)
     {
         hash = hash * seed + it;
     }
+    std::cout << (hash) << std::endl;
     return (hash & 0x7FFFFFFF);
 }
 uint32_t simHash(std::vector<std::pair<uint32_t,int>> feature) {
@@ -50,7 +51,8 @@ int testgg(int x,std::shared_ptr<std::vector<int>> tmp) {
 
 int main() {
     //bind(std::bind(testgg, 122, 23));
-    
+    std::string tmp = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::cout << toHash(tmp) << std::endl;
     /*std::string x="ABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVABCDEFGHIJKLVVVVVVVVVVVVVV";
     std::string tmp="ABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKLABCDEFGHIJKL";
     std::string v;
