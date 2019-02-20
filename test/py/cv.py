@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 '''
 
-import torch
 import numpy as np
  
 z=np.fft.fft([3,5,8])

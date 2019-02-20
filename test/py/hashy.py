@@ -1,6 +1,8 @@
 '''
 # -*- coding: utf-8 -*-
 '''
+
+
 def to_hash(list_v):
     """
     BKDRHash
@@ -9,11 +11,12 @@ def to_hash(list_v):
     hash_v = 0
     if isinstance('a', str):
         for itor in list_v:
-            hash_v = hash_v*seed+ord(itor)    
+            hash_v = hash_v * seed + ord(itor)
     else:
         for itor in list_v:
-            hash_v = hash_v*seed+itor
+            hash_v = hash_v * seed + itor
     return hash_v & 0x7FFFFFFF
+
 
 def sim_hash(list_v):
     """
@@ -30,6 +33,7 @@ def sim_hash(list_v):
         if val[i] > 0:
             hash_v |= (1 << i)
     return hash_v
+
 
 def hanming_distance(hash1, hash2):
     """
