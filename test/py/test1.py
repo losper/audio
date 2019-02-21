@@ -1,11 +1,13 @@
 '''
 # -*- coding: utf-8 -*-
 # ref:https://haythamfayek.com/2016/04/21/speech-processing-for-machine-learning.html
+# ref:https://blog.csdn.net/xl928471061/article/details/72896293
 '''
 # import sys
 # import wave
 
 import matplotlib.pyplot as plt
+from scipy.fftpack import dct
 # import np as np
 
 import wavinfo as wv
@@ -56,7 +58,6 @@ plt.plot(pow_frames[0])
 plt.show()
 
 # Filter Banks
-# 这一段不明白什么意思
 nfilt = 40
 low_freq_mel = 0
 high_freq_mel = (2595 * np.log10(1 + (rate / 2) / 700))  # Convert Hz to Mel
@@ -64,6 +65,12 @@ mel_points = np.linspace(low_freq_mel, high_freq_mel,
                          nfilt + 2)  # Equally spaced in Mel scale
 hz_points = (700 * (10**(mel_points / 2595) - 1))  # Convert Mel to Hz
 bin = np.floor((NFFT + 1) * hz_points / rate)
+
+freq = []  # 采样频率值
+df = rate / NFFT
+for n in range(0, int(NFFT / 2 + 1)):
+    freqs = int(n * df)
+    freq.append(freqs)
 
 fbank = np.zeros((nfilt, int(np.floor(NFFT / 2 + 1))))
 for m in range(1, nfilt + 1):
@@ -74,13 +81,19 @@ for m in range(1, nfilt + 1):
         fbank[m - 1, k] = (k - bin[m - 1]) / (bin[m] - bin[m - 1])
     for k in range(f_m, f_m_plus):
         fbank[m - 1, k] = (bin[m + 1] - k) / (bin[m + 1] - bin[m])
+    plt.plot(freq, fbank[m - 1])
+plt.show()
 
 print("pow_frames:", pow_frames.shape, "fbank:", fbank.shape)
 filter_banks = np.dot(pow_frames, fbank.T)
+# filter_banks 's data can not be 0
 filter_banks = np.where(filter_banks == 0,
                         np.finfo(float).eps,
                         filter_banks)  # Numerical Stability
 filter_banks = 20 * np.log10(filter_banks)  # dB
 print("filter_banks:", filter_banks.shape)
-plt.specgram(filter_banks, NFFT, rate)
-plt.show()
+num_ceps = 12
+mfcc = dct(
+    filter_banks, type=2, axis=1,
+    norm='ortho')[:, 1:(num_ceps + 1)]  # Keep 2-13
+print("mfcc:", mfcc.shape)
