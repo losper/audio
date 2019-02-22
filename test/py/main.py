@@ -7,7 +7,7 @@ num_samples = 0
 time = 0
 
 
-def save_wave_file(filename, data, channels, sampwidth):
+def save_wave_file(filename, data, framerate, channels, sampwidth):
     '''save the date to the wavfile'''
     wf = wave.open(filename, 'wb')
     wf.setnchannels(channels)  # 声道
@@ -34,7 +34,7 @@ def record(sec, framerate, num_samples):
         my_buf.append(string_audio_data)
         count += num_samples
         print('.')
-    save_wave_file('back1.wav', my_buf, 1, 2)
+    save_wave_file('back1.wav', my_buf, framerate, 1, 2)
     stream.close()
 
 
@@ -46,8 +46,7 @@ def play(chunk=4096):
         channels=wf.getnchannels(),
         rate=wf.getframerate(),
         output=True)
-    t = threading.Thread(target=record, args=(4096,))
-    t.start()
+
     while True:
         data = wf.readframes(chunk)
         if len(data) == 0:
@@ -59,5 +58,8 @@ def play(chunk=4096):
 
 if __name__ == "__main__":
     t = threading.Thread(target=play, args=(4096,))
+    t1 = threading.Thread(target=record, args=(3, 22050, 4096))
     t.start()
+    t1.start()
     t.join()
+    t1.join()

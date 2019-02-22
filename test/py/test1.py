@@ -14,7 +14,7 @@ import wavinfo as wv
 import numpy as np
 # read wav samples
 sec = 3
-data, rate = wv.wav_read('../data/OSR_us_000_0010_8k.wav', sec)
+data, rate = wv.wav_read('1.wav', sec)
 time = np.arange(0, rate * sec) * (1.0 / rate)
 # pre_emphasis
 pre_emphasis = 0.97
