@@ -18,9 +18,9 @@ def save_wave_file(filename, data, framerate, channels, sampwidth):
 def main():
     SAMPLING_RATE = 44100
     t = np.arange(0, 2.0, 1.0 / SAMPLING_RATE)
-    data = 8000 * np.sin(2 * 20 * 100 * np.pi * t)
+    data = 4000 * np.sin(2 * 10 * 100 * np.pi * t)+2000 * np.sin(2 * 5 * 100 * np.pi * t)
     td = data.astype(np.int16)
-    save_wave_file("test.wav", td, SAMPLING_RATE, 1, 2)
+    save_wave_file("test2.wav", td, SAMPLING_RATE, 1, 2)
     plt.plot(data)
     plt.show()
 

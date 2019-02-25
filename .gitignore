@@ -1,4 +1,5 @@
 # Compiled Object files
+__pycache__
 *~
 *.sln
 *.vcxproj*
