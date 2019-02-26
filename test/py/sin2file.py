@@ -18,10 +18,13 @@ def save_wave_file(filename, data, framerate, channels, sampwidth):
 def main():
     SAMPLING_RATE = 44100
     t = np.arange(0, 2.0, 1.0 / SAMPLING_RATE)
-    data = 4000 * np.sin(2 * 10 * 100 * np.pi * t)+2000 * np.sin(2 * 5 * 100 * np.pi * t)
-    td = data.astype(np.int16)
-    save_wave_file("test2.wav", td, SAMPLING_RATE, 1, 2)
-    plt.plot(data)
+    data = 1000 * np.sin(2 * 10 * np.pi * t)
+
+    # td = data.astype(np.int16)
+    # save_wave_file("test2.wav", td, SAMPLING_RATE, 1, 2)
+    td = np.fft.rfft(data, 512)
+    datause = td * 1.0 / (max(abs(td)))
+    plt.plot(datause)
     plt.show()
 
 

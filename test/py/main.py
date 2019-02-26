@@ -57,9 +57,10 @@ def play(chunk=4096):
 
 
 if __name__ == "__main__":
-    t = threading.Thread(target=play, args=(4096,))
-    t1 = threading.Thread(target=record, args=(3, 22050, 4096))
-    t.start()
-    t1.start()
-    t.join()
-    t1.join()
+    record(3, 22050, 4096)
+    # t = threading.Thread(target=play, args=(4096,))
+    # t1 = threading.Thread(target=record, args=(3, 22050, 4096))
+    # t.start()
+    # t1.start()
+    # t.join()
+    # t1.join()

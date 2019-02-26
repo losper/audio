@@ -21,15 +21,21 @@ def framing(signal, rate, frame_size, frame_stride):
     return frames
 
 
-data, time, rate, nframes = wv.read_wav("../data/1.wav")
-plt.plot(time, data)
-plt.show()
-frames = framing(data, rate, 0.025, 0.01)
-plt.plot(frames[40])
-plt.show()
-
-frames *= np.hamming(len(frames[0]))
-mag_frames = np.absolute(np.fft.rfft(frames, 512))
-for n in np.arange(5):
-    plt.plot(mag_frames[40 + n])
+def getff(path):
+    data, time, rate, nframes = wv.read_wav(path)
+    plt.plot(time, data)
     plt.show()
+    frames = framing(data, rate, 0.025, 0.01)
+    plt.plot(frames[40])
+    plt.show()
+    NFFT = 512
+    frames *= np.hamming(len(frames[0]))
+    mag_frames = np.absolute(np.fft.rfft(frames, NFFT))
+    pow_frames = ((1.0 / NFFT) * ((mag_frames)**2))  # Power Spectrum
+    return pow_frames
+
+
+data = getff("../data/1.wav")
+for frame in data:
+    for v in frame[1:]:
+        
